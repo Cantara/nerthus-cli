@@ -8,18 +8,18 @@ import (
 )
 
 // certCmd represents the cert command
-var certCmd = &cobra.Command{
-	Use:   "cert",
-	Short: "Cert will manage your public ssh cert",
-	Long: `Cert will manage your public ssh cert
-Cert can: 
-Add a new cert to Nerthus
-List the cert you have added to Nerthus
-Delete certs from Nerthus`,
+var keyCmd = &cobra.Command{
+	Use:   "key",
+	Short: "Key will manage your public ssh key",
+	Long: `Key will manage your public ssh key
+Key can: 
+Add a new pub key to Nerthus
+List the pub keys you have added to Nerthus
+Delete pub key from Nerthus`,
 }
 
 func init() {
-	rootCmd.AddCommand(certCmd)
+	rootCmd.AddCommand(keyCmd)
 
 	// Here you will define your flags and configuration settings.
 

@@ -24,8 +24,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"os/exec"
+	"syscall"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 type Server struct {
@@ -35,7 +39,17 @@ type Server struct {
 }
 
 func getServers() (servers []Server) {
-	r, err := http.Get("https://nerthus.greps.dev/servers")
+	req, err := http.NewRequest(
+		http.MethodGet,
+		fmt.Sprintf("https://%s/servers", viper.GetString("nerthus")),
+		nil,
+	)
+	if err != nil {
+		panic(err)
+	}
+	req.SetBasicAuth(viper.GetString("username"), viper.GetString("password"))
+	client := &http.Client{}
+	r, err := client.Do(req)
 	if err != nil {
 		panic(err)
 	}
@@ -54,11 +68,27 @@ var sshCmd = &cobra.Command{
 Can select what user and what node to ssh to`,
 	Args: cobra.RangeArgs(1, 2), // cobra.MatchAll(cobra.MinimumNArgs(1), cobra.MaximumNArgs(2)),
 	Run: func(cmd *cobra.Command, args []string) {
+		servers := getServers()
+		serverNames := make([]string, len(servers))
+		i := 0
+		serverInfo := map[string]Server{}
+		for _, server := range servers {
+			serverNames[i] = server.Name
+			serverInfo[server.Name] = server
+			i++
+		}
+		var host string
+		hostInfo, ok := serverInfo[args[0]]
+		if ok {
+			host = hostInfo.Host
+		} else {
+			host = args[0]
+		}
 		switch len(args) {
 		case 1:
-			fmt.Printf("ssh %s@%s\n", "ec2-user", args[0])
+			ssh("ec2-user", host)
 		case 2:
-			fmt.Printf("ssh %s@%s\n", args[1], args[0])
+			ssh(args[1], host)
 		}
 	},
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -94,4 +124,13 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// sshCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+}
+
+func ssh(user, host string) {
+	fmt.Printf("ssh %s@%s\n", user, host)
+	binary, lookErr := exec.LookPath("ssh")
+	if lookErr != nil {
+		panic(lookErr)
+	}
+	syscall.Exec(binary, []string{"ssh", fmt.Sprintf("%s@%s", user, host)}, os.Environ())
 }

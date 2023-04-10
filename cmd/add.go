@@ -4,23 +4,68 @@ Copyright © 2023 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"bytes"
 	"fmt"
+	"net/http"
 	"os"
 
+	jsoniter "github.com/json-iterator/go"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
+
+var homeDir, _ = os.UserHomeDir()
+
+type key struct {
+	Name string `json:"name"`
+	Data string `json:"data"`
+}
+
+func putKey(cmd *cobra.Command) (servers []Server) {
+	path, _ := cmd.Flags().GetString("path")
+	name, _ := cmd.Flags().GetString("name")
+	owner, _ := cmd.Flags().GetString("owner")
+	pubKey, err := os.ReadFile(path)
+	if err != nil {
+		panic(err)
+	}
+	k := key{
+		Name: name,
+		Data: string(pubKey),
+	}
+	body, err := jsoniter.Marshal(k)
+	if err != nil {
+		panic(err)
+	}
+	req, err := http.NewRequest(
+		http.MethodPut,
+		fmt.Sprintf("https://%s/key/%s/%s", viper.GetString("nerthus"), owner, name),
+		bytes.NewReader(body),
+	)
+	if err != nil {
+		panic(err)
+	}
+	req.SetBasicAuth(viper.GetString("username"), viper.GetString("password"))
+	client := &http.Client{}
+	_, err = client.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	return
+}
 
 // addCmd represents the add command
 var addCmd = &cobra.Command{
 	Use:   "add",
 	Short: "Adds a new public ssh cert to Nerthus",
+	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("add called")
+		putKey(cmd)
 	},
 }
 
 func init() {
-	certCmd.AddCommand(addCmd)
+	keyCmd.AddCommand(addCmd)
 
 	// Here you will define your flags and configuration settings.
 
@@ -30,7 +75,9 @@ func init() {
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	hn, _ := os.Hostname()
-	addCmd.Flags().StringP("path", "p", "~/.ssh/id_rsa.pub", "Path for public ssh cert")
-	addCmd.Flags().StringP("name", "n", hn, "Friendly name of cert")
+	hostName, _ := os.Hostname()
+	addCmd.Flags().StringP("path", "p", homeDir+"/.ssh/id_rsa.pub", "Path for public ssh cert")
+	addCmd.Flags().StringP("name", "n", hostName, "Friendly name of cert")
+	addCmd.Flags().StringP("owner", "o", "", "Owner of cert")
+	addCmd.MarkFlagRequired("owner")
 }
