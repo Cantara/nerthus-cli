@@ -21,13 +21,18 @@ THE SOFTWARE.
 */package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
+	"time"
 
+	log "github.com/cantara/bragi/sbragi"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -38,25 +43,53 @@ type Server struct {
 	Users []string `json:"users"`
 }
 
-func getServers() (servers []Server) {
+var serversCache *[]Server
+
+var (
+	zeroDialer net.Dialer
+	httpClient = &http.Client{
+		Timeout: 10 * time.Second,
+	}
+)
+
+func init() {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		return zeroDialer.DialContext(ctx, "tcp4", addr)
+	}
+	httpClient.Transport = transport
+}
+
+func getServers(profile Profile) (servers []Server) {
+	if serversCache != nil {
+		return *serversCache
+	}
 	req, err := http.NewRequest(
 		http.MethodGet,
-		fmt.Sprintf("https://%s/servers", viper.GetString("nerthus")),
+		fmt.Sprintf("https://%s/servers", profile.nerthusHost),
 		nil,
 	)
 	if err != nil {
+		log.WithError(err).Error("while creating request")
 		panic(err)
 	}
-	req.SetBasicAuth(viper.GetString("username"), viper.GetString("password"))
-	client := &http.Client{}
-	r, err := client.Do(req)
+	req.SetBasicAuth(profile.username, profile.password)
+	// tr := &http.Transport{
+	// 	TLSHandshakeTimeout: 30 * time.Second,
+	// 	DisableKeepAlives:   true,
+	// }
+	// client := &http.Client{Transport: tr}
+	r, err := httpClient.Do(req)
 	if err != nil {
+		log.WithError(err).Error("while executing request")
 		panic(err)
 	}
 	err = json.NewDecoder(r.Body).Decode(&servers)
 	if err != nil {
+		log.WithError(err).Error("while reading request")
 		panic(err)
 	}
+	serversCache = &servers
 	return
 }
 
@@ -66,9 +99,10 @@ var sshCmd = &cobra.Command{
 	Short: "Command to ssh onto a node",
 	Long: `Helps ssh onto a single node. 
 Can select what user and what node to ssh to`,
-	Args: cobra.RangeArgs(1, 2), // cobra.MatchAll(cobra.MinimumNArgs(1), cobra.MaximumNArgs(2)),
+	Args: cobra.RangeArgs(2, 3), // cobra.MatchAll(cobra.MinimumNArgs(1), cobra.MaximumNArgs(2)),
 	Run: func(cmd *cobra.Command, args []string) {
-		servers := getServers()
+		profile := GetProfile(args)
+		servers := getServers(profile)
 		serverNames := make([]string, len(servers))
 		i := 0
 		serverInfo := map[string]Server{}
@@ -77,22 +111,32 @@ Can select what user and what node to ssh to`,
 			serverInfo[server.Name] = server
 			i++
 		}
-		var host string
-		hostInfo, ok := serverInfo[args[0]]
-		if ok {
-			host = hostInfo.Host
-		} else {
-			host = args[0]
+		hostname := args[1]
+		hostInfo, ok := serverInfo[hostname]
+		if !ok {
+			log.Fatal("host is not found", "hostname", hostname, "serverNames", serverNames)
 		}
 		switch len(args) {
-		case 1:
-			ssh("ec2-user", host)
 		case 2:
-			ssh(args[1], host)
+			ssh("ec2-user", hostInfo.Host)
+		case 3:
+			ssh(args[2], hostInfo.Host)
 		}
 	},
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		servers := getServers()
+		initConfig()
+		profile := GetProfile(args)
+		if len(args) == 0 {
+			var profileNames []string
+			for _, profileName := range viper.AllKeys() {
+				if !strings.HasSuffix(profileName, ".nerthus") {
+					continue
+				}
+				profileNames = append(profileNames, strings.TrimSuffix(profileName, ".nerthus"))
+			}
+			return profileNames, cobra.ShellCompDirectiveNoFileComp
+		}
+		servers := getServers(profile)
 		serverNames := make([]string, len(servers))
 		i := 0
 		serverInfo := map[string]Server{}
@@ -102,13 +146,12 @@ Can select what user and what node to ssh to`,
 			i++
 		}
 
-		switch len(args) {
-		case 0:
+		if len(args) == 1 {
 			return serverNames, cobra.ShellCompDirectiveNoFileComp
-		case 1:
-			return serverInfo[args[0]].Users, cobra.ShellCompDirectiveNoFileComp
 		}
-		return nil, cobra.ShellCompDirectiveNoFileComp
+
+		hostName := args[1]
+		return serverInfo[hostName].Users, cobra.ShellCompDirectiveNoFileComp
 	},
 }
 
