@@ -61,7 +61,7 @@ func putKey(cmd *cobra.Command, profile Profile) (servers []Server) {
 
 // addCmd represents the add command
 var addCmd = &cobra.Command{
-	Use:   "add",
+	Use:   "add <profile>",
 	Short: "Adds a new public ssh cert to Nerthus",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {

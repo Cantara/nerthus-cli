@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	log "github.com/cantara/bragi/sbragi"
 	"github.com/spf13/viper"
 )
@@ -13,9 +14,9 @@ type Profile struct {
 }
 
 func GetDefault(args []string) (profile string) {
-	profile = viper.GetString("profile")
-	if len(args) == 1 {
-		if !viper.IsSet(args[0]) {
+	profile = viper.GetString("default_profile")
+	if len(args) >= 1 {
+		if !viper.IsSet(fmt.Sprintf("%s.nerthus", args[0])) {
 			log.Fatal(
 				"provided profile was not set",
 				"arg",

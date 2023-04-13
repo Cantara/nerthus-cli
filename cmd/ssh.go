@@ -95,7 +95,7 @@ func getServers(profile Profile) (servers []Server) {
 
 // sshCmd represents the ssh command
 var sshCmd = &cobra.Command{
-	Use:   "ssh",
+	Use:   "ssh <profile> <node_name> [user]",
 	Short: "Command to ssh onto a node",
 	Long: `Helps ssh onto a single node. 
 Can select what user and what node to ssh to`,
