@@ -84,6 +84,7 @@ func getServers(profile Profile) (servers []Server) {
 		log.WithError(err).Error("while executing request")
 		panic(err)
 	}
+	//TODO HANDLE HTTP STATUS AND PRINT ERROR MESSAGE
 	err = json.NewDecoder(r.Body).Decode(&servers)
 	if err != nil {
 		log.WithError(err).Error("while reading request")
@@ -97,7 +98,7 @@ func getServers(profile Profile) (servers []Server) {
 var sshCmd = &cobra.Command{
 	Use:   "ssh <profile> <node_name> [user]",
 	Short: "Command to ssh onto a node",
-	Long: `Helps ssh onto a single node. 
+	Long: `Helps ssh onto a single node.
 Can select what user and what node to ssh to`,
 	Args: cobra.RangeArgs(2, 3), // cobra.MatchAll(cobra.MinimumNArgs(1), cobra.MaximumNArgs(2)),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -116,11 +117,25 @@ Can select what user and what node to ssh to`,
 		if !ok {
 			log.Fatal("host is not found", "hostname", hostname, "serverNames", serverNames)
 		}
+        var flags []string
+	    tunnel, _ := cmd.Flags().GetBool("tunnel")
+        if tunnel {
+            local, _ := cmd.Flags().GetInt("local")
+            remote, _ := cmd.Flags().GetInt("remote")
+            if local == 0 || remote == 0 {
+                log.Fatal("while tunneling local and remote ports needs to be set", "local", local, "remote", remote)
+            }
+            host, _ := cmd.Flags().GetString("remote_host")
+            flags = []string{
+                "-L", fmt.Sprintf("%d:%s:%d", local, host, remote), "-N",
+            }
+        }
+
 		switch len(args) {
 		case 2:
-			ssh("ec2-user", hostInfo.Host)
+			ssh("ec2-user", hostInfo.Host, flags)
 		case 3:
-			ssh(args[2], hostInfo.Host)
+			ssh(args[2], hostInfo.Host, flags)
 		}
 	},
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -167,13 +182,21 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// sshCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	sshCmd.Flags().BoolP("tunnel", "t", false, "Settup SSH tunnel")
+	sshCmd.Flags().StringP("remote_host", "n", "localhost", "SSH tunnel remote_host")
+	sshCmd.Flags().IntP("remote", "r", 0, "SSH tunnel remote port")
+	sshCmd.Flags().IntP("local", "l", 0, "SSH tunnel remote local")
 }
 
-func ssh(user, host string) {
-	fmt.Printf("ssh %s@%s\n", user, host)
+func ssh(user, host string, args []string) {
+	fmt.Printf("ssh %s@%s %s\n", user, host, strings.Join(args, " "))
 	binary, lookErr := exec.LookPath("ssh")
 	if lookErr != nil {
 		panic(lookErr)
 	}
-	syscall.Exec(binary, []string{"ssh", fmt.Sprintf("%s@%s", user, host)}, os.Environ())
+    if len(args) == 0 {
+	    syscall.Exec(binary, []string{"ssh", fmt.Sprintf("%s@%s", user, host)}, os.Environ())
+    } else {
+	    syscall.Exec(binary, append([]string{"ssh", fmt.Sprintf("%s@%s", user, host)}, args...), os.Environ())
+    }
 }
