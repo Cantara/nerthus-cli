@@ -94,6 +94,33 @@ func getServers(profile Profile) (servers []Server) {
 	return
 }
 
+func openSSH(profile Profile, server string) (servers []Server) {
+	req, err := http.NewRequest(
+		http.MethodPut,
+		fmt.Sprintf("https://%s/ssh/%s", profile.nerthusHost, server),
+		nil,
+	)
+	if err != nil {
+		log.WithError(err).Error("while creating request")
+		panic(err)
+	}
+	req.SetBasicAuth(profile.username, profile.password)
+	// tr := &http.Transport{
+	// 	TLSHandshakeTimeout: 30 * time.Second,
+	// 	DisableKeepAlives:   true,
+	// }
+	// client := &http.Client{Transport: tr}
+	r, err := httpClient.Do(req)
+	if err != nil {
+		log.WithError(err).Error("while executing request")
+		panic(err)
+	}
+	if r.StatusCode != http.StatusOK {
+		log.Warning("non okay status code while opening ssh")
+	}
+	return
+}
+
 // sshCmd represents the ssh command
 var sshCmd = &cobra.Command{
 	Use:   "ssh <profile> <node_name> [user]",
@@ -117,20 +144,21 @@ Can select what user and what node to ssh to`,
 		if !ok {
 			log.Fatal("host is not found", "hostname", hostname, "serverNames", serverNames)
 		}
-        var flags []string
-	    tunnel, _ := cmd.Flags().GetBool("tunnel")
-        if tunnel {
-            local, _ := cmd.Flags().GetInt("local")
-            remote, _ := cmd.Flags().GetInt("remote")
-            if local == 0 || remote == 0 {
-                log.Fatal("while tunneling local and remote ports needs to be set", "local", local, "remote", remote)
-            }
-            host, _ := cmd.Flags().GetString("remote_host")
-            flags = []string{
-                "-L", fmt.Sprintf("%d:%s:%d", local, host, remote), "-N",
-            }
-        }
+		var flags []string
+		tunnel, _ := cmd.Flags().GetBool("tunnel")
+		if tunnel {
+			local, _ := cmd.Flags().GetInt("local")
+			remote, _ := cmd.Flags().GetInt("remote")
+			if local == 0 || remote == 0 {
+				log.Fatal("while tunneling local and remote ports needs to be set", "local", local, "remote", remote)
+			}
+			host, _ := cmd.Flags().GetString("remote_host")
+			flags = []string{
+				"-L", fmt.Sprintf("%d:%s:%d", local, host, remote), "-N",
+			}
+		}
 
+		openSSH(profile, hostInfo.Name)
 		switch len(args) {
 		case 2:
 			ssh("ec2-user", hostInfo.Host, flags)
@@ -194,9 +222,9 @@ func ssh(user, host string, args []string) {
 	if lookErr != nil {
 		panic(lookErr)
 	}
-    if len(args) == 0 {
-	    syscall.Exec(binary, []string{"ssh", fmt.Sprintf("%s@%s", user, host)}, os.Environ())
-    } else {
-	    syscall.Exec(binary, append([]string{"ssh", fmt.Sprintf("%s@%s", user, host)}, args...), os.Environ())
-    }
+	if len(args) == 0 {
+		syscall.Exec(binary, []string{"ssh", fmt.Sprintf("%s@%s", user, host)}, os.Environ())
+	} else {
+		syscall.Exec(binary, append([]string{"ssh", fmt.Sprintf("%s@%s", user, host)}, args...), os.Environ())
+	}
 }
