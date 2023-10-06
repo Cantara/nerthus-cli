@@ -106,9 +106,9 @@ func execConfig(profile Profile, path string) (envs []string) {
 // sshCmd represents the ssh command
 var confCmd = &cobra.Command{
 	Use:   "conf <profile> <env> [system] [cluster] [service]",
-	Short: "Command to ssh onto a node",
-	Long: `Helps ssh onto a single node.
-Can select what user and what node to ssh to`,
+	Short: "Command to execute config deployment",
+	Long: `Helps deploy config changes.
+Can execute on every level, from the whole solution to a single service`,
 	Args: cobra.RangeArgs(2, 5), // cobra.MatchAll(cobra.MinimumNArgs(1), cobra.MaximumNArgs(2)),
 	Run: func(cmd *cobra.Command, args []string) {
 		profile := GetProfile(args)
