@@ -3,7 +3,7 @@ module github.com/cantara/nerthus-cli
 go 1.21
 
 require (
-	github.com/cantara/bragi v0.7.3
+	github.com/cantara/bragi v0.7.4
 	github.com/json-iterator/go v1.1.12
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.17.0
