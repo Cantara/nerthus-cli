@@ -22,31 +22,50 @@ THE SOFTWARE.
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
-	"os"
-	"os/exec"
+	"slices"
 	"strings"
-	"syscall"
+	"time"
 
+	"github.com/acarl005/textcol"
 	log "github.com/cantara/bragi/sbragi"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
+type Server struct {
+	Host  string   `json:"host"`
+	Name  string   `json:"name"`
+	Users []string `json:"users"`
+}
+
+var serversCache *[]Server
+
+var (
+	zeroDialer net.Dialer
+	httpClient = &http.Client{
+		Timeout: 10 * time.Second,
+	}
+)
+
 func init() {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-		return zeroDialer.DialContext(ctx, "tcp4", addr)
+		return zeroDialer.DialContext(ctx, "tcp4", addr) //Should be able to remove ipv4 block soon
 	}
 	httpClient.Transport = transport
 }
 
-func openSSH(profile Profile, server string) (servers []Server) {
+func getServers(profile Profile) (servers []Server) {
+	if serversCache != nil {
+		return *serversCache
+	}
 	req, err := http.NewRequest(
-		http.MethodPut,
-		fmt.Sprintf("https://%s/ssh/%s", profile.nerthusHost, server),
+		http.MethodGet,
+		fmt.Sprintf("https://%s/servers", profile.nerthusHost),
 		nil,
 	)
 	if err != nil {
@@ -64,60 +83,44 @@ func openSSH(profile Profile, server string) (servers []Server) {
 		log.WithError(err).Error("while executing request")
 		panic(err)
 	}
-	if r.StatusCode != http.StatusOK {
-		log.Warning("non okay status code while opening ssh")
+	//TODO HANDLE HTTP STATUS AND PRINT ERROR MESSAGE
+	err = json.NewDecoder(r.Body).Decode(&servers)
+	if err != nil {
+		log.WithError(err).Error("while reading request")
+		panic(err)
 	}
+	serversCache = &servers
 	return
 }
 
-// sshCmd represents the ssh command
-var sshCmd = &cobra.Command{
-	Use:   "ssh <profile> <node_name> [user]",
-	Short: "Command to ssh onto a node",
-	Long: `Helps ssh onto a single node.
-Can select what user and what node to ssh to`,
-	Args: cobra.RangeArgs(2, 3), // cobra.MatchAll(cobra.MinimumNArgs(1), cobra.MaximumNArgs(2)),
+var serversCmd = &cobra.Command{
+	Use:   "servers <profile>",
+	Short: "Lists all servers in profile",
+	Long:  `Lists all servers in a profile`,
+	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		profile := GetProfile(args)
-		servers := getServers(profile)
-		serverNames := make([]string, len(servers))
-		i := 0
-		serverInfo := map[string]Server{}
-		for _, server := range servers {
-			serverNames[i] = server.Name
-			serverInfo[server.Name] = server
-			i++
+		serversInfo := getServers(profile)
+		servers := make([]string, len(serversInfo))
+		for i, server := range serversInfo {
+			servers[i] = server.Name
 		}
-		hostname := args[1]
-		hostInfo, ok := serverInfo[hostname]
-		if !ok {
-			log.Fatal("host is not found", "hostname", hostname, "serverNames", serverNames)
-		}
-		var flags []string
-		tunnel, _ := cmd.Flags().GetBool("tunnel")
-		if tunnel {
-			local, _ := cmd.Flags().GetInt("local")
-			remote, _ := cmd.Flags().GetInt("remote")
-			if local == 0 || remote == 0 {
-				log.Fatal("while tunneling local and remote ports needs to be set", "local", local, "remote", remote)
+		slices.Sort[[]string, string](servers)
+		textcol.PrintColumns(&servers, 4)
+		/*
+			servers := map[string][]string{}
+			for _, server := range serversInfo {
+				env := strings.Split(server.Name, "-")[0]
+				servers[env] = append(servers[env], server.Name)
 			}
-			host, _ := cmd.Flags().GetString("remote_host")
-			flags = []string{
-				"-L", fmt.Sprintf("%d:%s:%d", local, host, remote), "-N",
+			for k, v := range servers {
+				fmt.Println(k)
+				textcol.PrintColumns(&v, 4)
 			}
-		}
-
-		openSSH(profile, hostInfo.Name)
-		switch len(args) {
-		case 2:
-			ssh("ec2-user", hostInfo.Host, flags)
-		case 3:
-			ssh(args[2], hostInfo.Host, flags)
-		}
+		*/
 	},
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		initConfig()
-		profile := GetProfile(args)
 		if len(args) == 0 {
 			var profileNames []string
 			for _, profileName := range viper.AllKeys() {
@@ -128,27 +131,12 @@ Can select what user and what node to ssh to`,
 			}
 			return profileNames, cobra.ShellCompDirectiveNoFileComp
 		}
-		servers := getServers(profile)
-		serverNames := make([]string, len(servers))
-		i := 0
-		serverInfo := map[string]Server{}
-		for _, server := range servers {
-			serverNames[i] = server.Name
-			serverInfo[server.Name] = server
-			i++
-		}
-
-		if len(args) == 1 {
-			return serverNames, cobra.ShellCompDirectiveNoFileComp
-		}
-
-		hostName := args[1]
-		return serverInfo[hostName].Users, cobra.ShellCompDirectiveNoFileComp
+		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(sshCmd)
+	rootCmd.AddCommand(serversCmd)
 
 	// Here you will define your flags and configuration settings.
 
@@ -159,21 +147,4 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// sshCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-	sshCmd.Flags().BoolP("tunnel", "t", false, "Settup SSH tunnel")
-	sshCmd.Flags().StringP("remote_host", "n", "localhost", "SSH tunnel remote_host")
-	sshCmd.Flags().IntP("remote", "r", 0, "SSH tunnel remote port")
-	sshCmd.Flags().IntP("local", "l", 0, "SSH tunnel remote local")
-}
-
-func ssh(user, host string, args []string) {
-	fmt.Printf("ssh %s@%s %s\n", user, host, strings.Join(args, " "))
-	binary, lookErr := exec.LookPath("ssh")
-	if lookErr != nil {
-		panic(lookErr)
-	}
-	if len(args) == 0 {
-		syscall.Exec(binary, []string{"ssh", fmt.Sprintf("%s@%s", user, host)}, os.Environ())
-	} else {
-		syscall.Exec(binary, append([]string{"ssh", fmt.Sprintf("%s@%s", user, host)}, args...), os.Environ())
-	}
 }

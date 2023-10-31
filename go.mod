@@ -3,6 +3,7 @@ module github.com/cantara/nerthus-cli
 go 1.21
 
 require (
+	github.com/acarl005/textcol v0.0.0
 	github.com/cantara/bragi v0.7.4
 	github.com/json-iterator/go v1.1.12
 	github.com/spf13/cobra v1.7.0
@@ -10,6 +11,7 @@ require (
 )
 
 require (
+	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
