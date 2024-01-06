@@ -2,8 +2,8 @@ github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d h1:licZJFw2RwpH
 github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d/go.mod h1:asat636LX7Bqt5lYEZ27JNDcqxfjdBQuJ/MM4CN/Lzo=
 github.com/acarl005/textcol v0.0.0 h1:39UH8Ojpl8SMMKho1HgoQ8mQ7no4281u6SN/MyT5EU4=
 github.com/acarl005/textcol v0.0.0/go.mod h1:o8VbpDKrBLFfZtTo/AXk03Zn3dQHYOLJ8v//eaDtl78=
-github.com/cantara/bragi v0.7.4 h1:cxQ3JOb/iX7RB58vWoWvBs+KCcWwVD41SPpNYL5MPws=
-github.com/cantara/bragi v0.7.4/go.mod h1:btpJS4I5xGUohgnno50o8XD1qysPjozSrUzDjWr2W6Q=
+github.com/cantara/bragi v0.8.0 h1:0O3WyvJi7TrSIG49PXK6DoJwtQa+hrAPSfDSb5xPW+I=
+github.com/cantara/bragi v0.8.0/go.mod h1:btpJS4I5xGUohgnno50o8XD1qysPjozSrUzDjWr2W6Q=
 github.com/cpuguy83/go-md2man/v2 v2.0.2/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

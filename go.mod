@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/acarl005/textcol v0.0.0
-	github.com/cantara/bragi v0.7.4
+	github.com/cantara/bragi v0.8.0
 	github.com/json-iterator/go v1.1.12
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.18.2
