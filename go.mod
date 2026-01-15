@@ -2,7 +2,7 @@ module github.com/cantara/nerthus-cli
 
 go 1.23.0
 
-toolchain go1.25.1
+toolchain go1.25.6
 
 require (
 	github.com/acarl005/textcol v0.0.0
