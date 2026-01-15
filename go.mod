@@ -8,7 +8,7 @@ require (
 	github.com/acarl005/textcol v0.0.0
 	github.com/cantara/bragi v0.8.0
 	github.com/json-iterator/go v1.1.12
-	github.com/spf13/cobra v1.10.1
+	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 )
 
